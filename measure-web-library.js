@@ -82,31 +82,51 @@
     Object.assign(heading.style, { color: "#f4f0f8", font: "600 16px system-ui", margin: "2px 2px 10px" });
     const video = document.createElement("video");
     video.controls = true;
-    video.autoplay = true;
+    // Browser Discovery is an attribution-preserving source preview. Starting
+    // only after an explicit action is both clearer and less likely to be
+    // blocked by a browser's autoplay policy.
+    video.autoplay = false;
     video.playsInline = true;
     video.preload = "metadata";
     video.src = url;
     Object.assign(video.style, { display: "block", width: "100%", maxHeight: "72vh", background: "#000" });
+    const desktopNotice = document.createElement("p");
+    desktopNotice.textContent = "Preview an open-source video here. Download the free desktop app to experience this music as a playable, auto-charted session with video.";
+    Object.assign(desktopNotice.style, { color: "#d8c9f6", font: "13px system-ui", lineHeight: "1.45", margin: "12px 2px 0" });
     const footer = document.createElement("div");
     Object.assign(footer.style, { display: "flex", gap: "10px", justifyContent: "space-between", alignItems: "center", marginTop: "10px" });
     const attribution = document.createElement("span");
     attribution.textContent = credit ? `Source preview · ${credit}` : "Source preview";
     Object.assign(attribution.style, { color: "#b5abc5", font: "12px system-ui", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
     const actions = document.createElement("span");
+    Object.assign(actions.style, { display: "inline-flex", gap: "10px", alignItems: "center" });
+    const play = document.createElement("button");
+    play.textContent = "▶ PLAY PREVIEW";
+    play.type = "button";
+    play.setAttribute("aria-label", "Play source video and audio preview");
+    play.onclick = async () => {
+      try {
+        await video.play();
+        desktopNotice.textContent = "You are watching a source preview. Download the free desktop app to experience this music as a playable, auto-charted session with video.";
+      } catch (_) {
+        desktopNotice.textContent = "Your browser needs permission to play this source preview. Download the free desktop app to experience this music as a playable session with video.";
+      }
+    };
+    Object.assign(play.style, { color: "#171222", background: "#bba0f2", border: "0", borderRadius: "4px", padding: "8px 13px", font: "700 12px system-ui", cursor: "pointer" });
     const source = document.createElement("a");
     source.textContent = "SOURCE ↗";
     source.href = page || url;
     source.target = "_blank";
     source.rel = "noopener noreferrer";
-    Object.assign(source.style, { color: "#bba0f2", font: "600 12px system-ui", marginRight: "16px" });
+    Object.assign(source.style, { color: "#bba0f2", font: "600 12px system-ui" });
     const close = document.createElement("button");
     close.textContent = "CLOSE";
     close.type = "button";
     close.onclick = closePreview;
     Object.assign(close.style, { color: "#171222", background: "#bba0f2", border: "0", borderRadius: "4px", padding: "8px 13px", font: "700 12px system-ui", cursor: "pointer" });
-    actions.append(source, close);
+    actions.append(play, source, close);
     footer.append(attribution, actions);
-    frame.append(heading, video, footer);
+    frame.append(heading, video, desktopNotice, footer);
     overlay.append(frame);
     overlay.addEventListener("click", (event) => { if (event.target === overlay) closePreview(); });
     document.body.append(overlay);
