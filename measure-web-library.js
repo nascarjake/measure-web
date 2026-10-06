@@ -16,6 +16,8 @@
   let storage = { quota: 0, usage: 0, persistent: false };
   let previewOverlay = null;
   let previewVideo = null;
+  let previewDetails = null;
+  let pickerKind = "audio";
 
   const extensionOf = (name) => {
     const point = name.lastIndexOf(".");
@@ -59,34 +61,34 @@
     if (previewOverlay) previewOverlay.remove();
     previewOverlay = null;
     previewVideo = null;
+    previewDetails = null;
   };
 
   const previewVideoFromSource = ({ url, title, credit, page }) => {
     if (!url || !/^https:\/\//.test(url)) return false;
     closePreview();
     const overlay = document.createElement("section");
-    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("role", "region");
     overlay.setAttribute("aria-label", title || "Open video preview");
     Object.assign(overlay.style, {
-      position: "fixed", inset: "0", zIndex: "2147483647", display: "grid",
-      placeItems: "center", padding: "24px", background: "rgba(7, 5, 14, .84)",
+      position: "fixed", right: "16px", bottom: "110px", zIndex: "2147483647",
+      width: "min(390px, calc(100vw - 32px))", background: "transparent",
     });
     const frame = document.createElement("div");
     Object.assign(frame.style, {
-      width: "min(840px, 94vw)", maxHeight: "92vh", padding: "34px",
-      border: "1px solid rgba(187,160,242,.88)", borderRadius: "18px",
-      background: "linear-gradient(135deg, #3d3656 0%, #28233c 58%, #211c31 100%)",
-      boxShadow: "0 28px 90px rgba(0,0,0,.68)", boxSizing: "border-box",
+      width: "100%", maxHeight: "min(360px, 55vh)", padding: "14px",
+      border: "1px solid rgba(187,160,242,.50)", borderRadius: "12px",
+      background: "#111b2d", boxShadow: "0 15px 45px rgba(0,0,0,.6)", boxSizing: "border-box",
     });
     const eyebrow = document.createElement("div");
     eyebrow.textContent = "OPEN-SOURCE VIDEO  /  BROWSER PREVIEW";
     Object.assign(eyebrow.style, { color: "#c7b0f4", font: "600 12px system-ui", letterSpacing: ".045em", marginBottom: "8px" });
     const heading = document.createElement("div");
-    heading.textContent = "VIDEO SOURCE PREVIEW";
-    Object.assign(heading.style, { color: "#f4f0f8", font: "600 27px system-ui", letterSpacing: ".015em", margin: "0 0 6px" });
+    heading.textContent = "NOW PLAYING  /  SOURCE VIDEO";
+    Object.assign(heading.style, { color: "#f4f0f8", font: "600 14px system-ui", letterSpacing: ".015em", margin: "0 0 6px" });
     const metadata = document.createElement("div");
     metadata.textContent = [title, credit].filter(Boolean).join("  /  ") || "Open-source media";
-    Object.assign(metadata.style, { color: "#d8c9f6", font: "15px system-ui", margin: "0 0 16px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+    Object.assign(metadata.style, { color: "#d8c9f6", font: "13px system-ui", margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
     const video = document.createElement("video");
     video.controls = true;
     // Browser Discovery is an attribution-preserving source preview. Starting
@@ -96,10 +98,10 @@
     video.playsInline = true;
     video.preload = "metadata";
     video.src = url;
-    Object.assign(video.style, { display: "block", width: "100%", aspectRatio: "16 / 9", maxHeight: "52vh", objectFit: "contain", background: "#07050e", border: "1px solid rgba(215,198,255,.28)" });
+    Object.assign(video.style, { display: "block", width: "100%", aspectRatio: "16 / 9", maxHeight: "145px", objectFit: "contain", background: "#07050e", border: "1px solid rgba(215,198,255,.28)" });
     const desktopNotice = document.createElement("p");
     desktopNotice.textContent = "This is a source preview only. Download the free desktop app to add it to your library and play its auto-charted session with video.";
-    Object.assign(desktopNotice.style, { color: "#d8c9f6", font: "14px system-ui", lineHeight: "1.45", margin: "15px 0 0" });
+    Object.assign(desktopNotice.style, { color: "#d8c9f6", font: "11px system-ui", lineHeight: "1.35", margin: "7px 0 0" });
     const footer = document.createElement("div");
     Object.assign(footer.style, { display: "flex", gap: "10px", justifyContent: "space-between", alignItems: "center", marginTop: "10px" });
     const attribution = document.createElement("span");
@@ -135,10 +137,11 @@
     footer.append(attribution, actions);
     frame.append(eyebrow, heading, metadata, video, desktopNotice, footer);
     overlay.append(frame);
-    overlay.addEventListener("click", (event) => { if (event.target === overlay) closePreview(); });
     document.body.append(overlay);
     previewOverlay = overlay;
     previewVideo = video;
+    previewDetails = { title: title || "Open video preview", artist: credit || "" };
+    video.play().catch(() => {});
     return true;
   };
 
@@ -149,8 +152,8 @@
       return;
     }
     const extension = extensionOf(file.name);
-    if (!supported.has(extension)) {
-      error = "Choose an MP3, Ogg, or WAV file.";
+    if (!(pickerKind === "mapset" ? extension === "osz" : supported.has(extension))) {
+      error = pickerKind === "mapset" ? "Choose an osu! .osz mapset." : "Choose an MP3, Ogg, or WAV file.";
       state = "error";
       return;
     }
@@ -176,6 +179,18 @@
 
   window.MeasureWebLibrary = {
     pickAudio() {
+      pickerKind = "audio";
+      input.accept = ".mp3,.ogg,.wav,audio/mpeg,audio/ogg,audio/wav";
+      selectedFile = null;
+      selectedBuffer = null;
+      error = "";
+      state = "picking";
+      input.value = "";
+      input.click();
+    },
+    pickMapset() {
+      pickerKind = "mapset";
+      input.accept = ".osz";
       selectedFile = null;
       selectedBuffer = null;
       error = "";
@@ -205,5 +220,24 @@
     },
     previewVideo: previewVideoFromSource,
     closePreview,
+    previewStatus() {
+      if (!previewVideo) return {};
+      const duration = Number.isFinite(previewVideo.duration) ? previewVideo.duration : 0;
+      const buffered = previewVideo.buffered.length ? previewVideo.buffered.end(previewVideo.buffered.length - 1) : 0;
+      return { id: "web-source", ...previewDetails, position: previewVideo.currentTime || 0,
+        duration, buffered, paused: previewVideo.paused, waiting: previewVideo.readyState < 3,
+        complete: duration > 0 && buffered >= duration - 0.25 };
+    },
+    previewToggle() {
+      if (!previewVideo) return false;
+      if (previewVideo.paused) previewVideo.play().catch(() => {});
+      else previewVideo.pause();
+      return true;
+    },
+    previewSeek(seconds) {
+      if (!previewVideo || !Number.isFinite(seconds)) return false;
+      previewVideo.currentTime = Math.max(0, Math.min(seconds, Number.isFinite(previewVideo.duration) ? previewVideo.duration : seconds));
+      return true;
+    },
   };
 })();
